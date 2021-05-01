@@ -1,0 +1,149 @@
+--all
+--retorna todos os jogos classificados ao mesmo tempo com açao e aventura
+jogo_acao_aventura = { genero : {$all:["Ação" , "Aventura"]}} ;
+db.jogos.find(jogo_acao_aventura);
+--set && update
+--insere o campo que indica status de premium para cliente de id 2
+db.clientes.update({id:2} , {$set:{premium : true}}) ;
+-- text && search
+-- retorna todos os clientes de sexo masculino
+db.clientes.createIndex({sexo: "text"});
+clientes_homens = {$text:{$search:"Masculino"}} ;
+db.clientes.find(clientes_homens);
+-- filter
+-- retorna amigos com id menor que 2
+db.clientes.aggregate([
+   {
+      $project: {
+         amigos: {
+            $filter: {
+               input: "$amigosID",
+               as: "amigosID",
+               cond: { $lt: [ "$$amigosID", 3] }
+            }
+         }
+      }
+   }
+])
+
+-- find: acha os quatros jogos mais caros 
+db.jogos.find().sort({preco:-1}).limit(4).pretty();
+
+-- size: acha os jogos que tem genero com tamanho igual a 2
+filtro = {genero: {$size: 2}};
+db.jogos.find(filtro).pretty();
+
+-- aggregate: quantos jogos existem de cada genero (group by genero)
+db.jogos.aggregate(
+	{$group: {_id: '$genero', quantidade: {$sum:1}}}
+);
+
+-- match: exibe as informações do jogo com o nome Sudoku
+db.jogos.aggregate( {$match:{ nome: "Sudoku"}});
+
+-- project: exibe todos os jogos, mas apenas com o nome e genero
+projection = {_id: 0, nome: 1, genero: 1}
+db.jogos.find({}, projection);
+
+-- gte: exibe todos os jogos com preço maior que 20
+db.jogos.find( { preco: { $gte: 20 } } )
+
+--sort    mostra os jogos em ordem do mais barato pro mais caro
+db.jogos.aggregate(
+   [
+     { $sort : { preco : 1 } }
+   ]
+)
+
+--limit
+--$where
+
+db.clientes.find( { $where: function() {
+   return (this.cliente == "Matheus Ferreira")
+} } );
+
+	--outra opção caso a primeira esteja errada
+db.clientes.find( { $where: function() {
+   return (hex_md5(this.cliente) == "73a43acbca343df38d82b47e8b6f007e")
+} } );
+
+--mapreduce
+	--function
+	--pretty
+--Cria uma collection usando mapReduce chamada preco_total_dos_jogos, relacionando O id de um estúdio, e a soma dos preços dos jogos deste estúdio
+
+db.jogos.mapReduce(
+	function () { emit (this.estID, this.preco); },
+	function (key, values) { return Array.sum(values) },
+	{
+		query: {},
+		out: "preco_total_dos_jogos"
+	}
+);
+show collections;
+
+db.preco_total_dos_jogos.find().pretty();
+
+-- count: quantos jogos tem na plataforma funciona
+		db.jogos.count(); 
+
+-- exists: retorna os jogos que tem dlc FUNCIONA
+		db.jogos.find({DLC: {$exists: true}});
+
+--group:
+
+	--sum: retorna quantos jogos existem em cada classificação indicativa FUNCIONA
+			db.jogos.aggregate(
+				  {$group: {_id: '$class_ind', quantidade: {$sum:1}}}
+			);
+
+	--max: retorna jogo mais caro da plataforma FUNCIONA
+			db.jogos.aggregate(
+			    {$group: {_id: null, max: {$max: "$preco"}}}
+			);
+
+	--avg: retorna a média de preço dos jogos da plataforma FUNCIONA
+			db.jogos.aggregate(
+			    {$group: {_id: null, preco: {$avg: "$preco"}}}
+			);
+
+
+-- save: adicionar um novo estudio de jogos aos existentes
+		db.estudios.save({"id": 7, "cnpj": "51.799.191/0001-34", "nome": "Cactus Jogos" });
+
+-- renamecollection: altera o nome de clientes para usuarios
+		db.clientes.renameCollection("usuarios");
+
+-- cond:
+		db.jogos.aggredate([
+			{ $project: {
+					jogoLivre: {
+							$cond: [{ "$class_ind": "Livre"}, "Sim", "Nao"]
+					}
+				}
+		])
+		
+
+-- lookup: mostrar informações dos jogos que os clientes possuem
+		db.estudios.aggregate([
+			{
+				$lookup:
+					{
+						from: "jogos",
+						localfield: "id",
+						foreignField: "estID",
+						as: "jogos_produzidos"
+					}
+			}
+		])
+
+-- findone: retorna o nome de um cliente so sexo feminino
+		db.usuarios.findOne(
+		{ "sexo": "Feminino"},
+		{ "nome": 1})
+
+-- addtoset: adiciona o genero de jogos de Estrategia aos jogos de Puzzle
+		db.jogos.update(
+		{"genero": "Puzzle"},
+		{$addToSet: {"genero": "Estrategia"}}
+		)
